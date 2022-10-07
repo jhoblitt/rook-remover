@@ -5,7 +5,8 @@
 For when [Rook](https://rook.io/) absolutely, positively, must be uninstalled.
 
 > **_WARNING:_** This software will cause data loss!
-> If it doesn't, we are terribly sorry about the lack of irreversible destruction. Would you be so kind as to file a bug?
+> If it doesn't, we are terribly sorry about the lack of irreversible
+> destruction. Would you be so kind as to file a bug?
 
 ## Real-time Demo
 
