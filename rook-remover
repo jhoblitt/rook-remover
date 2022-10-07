@@ -1,0 +1,96 @@
+#!/bin/bash
+
+set -x
+
+print_error() {
+  >&2 echo -e "$@"
+}
+
+fail() {
+  local code=${2:-1}
+  [[ -n $1 ]] && print_error "$1"
+  # shellcheck disable=SC2086
+  exit $code
+}
+
+has_cmd() {
+  local command=${1?command is required}
+  command -v "$command" > /dev/null 2>&1
+}
+
+require_cmds() {
+  local cmds=("${@?at least one command is required}")
+  local errors=()
+
+  # accumulate a list of all missing commands before failing to reduce end-user
+  # install/retry cycles
+  for c in "${cmds[@]}"; do
+    if ! has_cmd "$c"; then
+      errors+=("prog: ${c} is required")
+    fi
+  done
+
+  if [[ ${#errors[@]} -ne 0 ]]; then
+    for e in "${errors[@]}"; do
+      print_error "$e"
+    done
+
+    fail 'failed because of missing commands'
+  fi
+}
+
+k() { kubectl "$@"; }
+
+definalize() {
+  local type="$1"
+
+  declare -a names
+  readarray -t names < <(k -n rook-ceph get "$type" -o json | jq -r '.items[].metadata.name')
+
+  for n in "${names[@]}"; do
+    k -n rook-ceph patch "${type}/${n}" --type json \
+      --patch='[ { "op": "remove", "path": "/metadata/finalizers" } ]'
+  done
+}
+
+require_cmds kubectl jq
+
+resource_types=(
+  cm
+  secret
+  cephblockpoolradosnamespaces
+  cephblockpools
+  cephbucketnotifications
+  cephbuckettopics
+  cephclients
+  cephclusters
+  cephfilesystemmirrors
+  cephfilesystems
+  cephfilesystemsubvolumegroups
+  cephnfses
+  cephobjectrealms
+  cephobjectstores
+  cephobjectstoreusers
+  cephobjectzonegroups
+  cephobjectzones
+  cephrbdmirrors
+  objectbucketclaims
+  objectbuckets
+)
+
+k delete validatingwebhookconfigurations rook-ceph-webhook
+
+# start deletion as rook is suspected of re-adding the finalizer to some watched resources
+k delete ns rook-ceph --wait=false
+# pause for resources that are willing to die without a fight
+sleep 10
+
+for t in "${resource_types[@]}"; do
+  definalize "$t"
+done
+
+k delete ns rook-ceph --wait=true
+
+k delete -f https://raw.githubusercontent.com/rook/rook/master/deploy/examples/crds.yaml
+
+# vim: tabstop=2 shiftwidth=2 expandtab
