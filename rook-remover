@@ -76,6 +76,8 @@ resource_types=(
   cephrbdmirrors
   objectbucketclaims
   objectbuckets
+  rolebinding
+  role
 )
 
 k delete validatingwebhookconfigurations rook-ceph-webhook
